@@ -170,9 +170,9 @@ namespace AgoraUWPDemo
             action?.Invoke();
             this.log("set channel profile", this.engine.SetChannelProfile(AgoraWinRT.CHANNEL_PROFILE_TYPE.CHANNEL_PROFILE_LIVE_BROADCASTING));
             this.log("set client role", this.engine.SetClientRole(AgoraWinRT.CLIENT_ROLE_TYPE.CLIENT_ROLE_BROADCASTER));
-            this.engine.SetupLocalVideo(new ImageBrushVideoCanvas
+            this.engine.SetupLocalVideo(new SpriteVisualVideoCanvas
             {
-                Target = localVideoBrush,
+                Target = localVideo,
                 RenderMode = AgoraWinRT.RENDER_MODE_TYPE.RENDER_MODE_FIT,
                 MirrorMode = AgoraWinRT.VIDEO_MIRROR_MODE_TYPE.VIDEO_MIRROR_MODE_ENABLED
             });
@@ -529,10 +529,10 @@ namespace AgoraUWPDemo
                 Windows.UI.Core.CoreDispatcherPriority.Normal,
                 () =>
                 {
-                    this.engine.SetupRemoteVideo(new ImageBrushVideoCanvas
+                    this.engine.SetupRemoteVideo(new SpriteVisualVideoCanvas
                     {
                         User = uid,
-                        Target = remoteVideoBrush,
+                        Target = remoteVideo,
                         RenderMode = AgoraWinRT.RENDER_MODE_TYPE.RENDER_MODE_FIT,
                         MirrorMode = AgoraWinRT.VIDEO_MIRROR_MODE_TYPE.VIDEO_MIRROR_MODE_ENABLED
                     });

@@ -13,7 +13,7 @@ namespace AgoraUWP
 {
     public static class Utils
     {
-        public static unsafe SoftwareBitmap ConvertToImageAsync(VideoMediaFrame input)
+        public static unsafe SoftwareBitmap ConvertToImage(VideoMediaFrame input)
         {
             if (input != null)
             {

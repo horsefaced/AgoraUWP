@@ -85,13 +85,15 @@
                     <ColumnDefinition ></ColumnDefinition>
                     <ColumnDefinition ></ColumnDefinition>
                     <ColumnDefinition></ColumnDefinition>
+                    <ColumnDefinition></ColumnDefinition>
+                    <ColumnDefinition></ColumnDefinition>
                 </Grid.ColumnDefinitions>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="auto" MinHeight="200"></RowDefinition>
                 </Grid.RowDefinitions>
                 <StackPanel Orientation="Vertical" Grid.Column="0" Grid.Row="0">
                     <TextBlock Text="本地视频："/>
-                    <Grid Height="320" Width="320" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" x:Name="localVideo">
+                    <Grid Height="320" Width="320" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
                         <Grid.Background>
                             <ImageBrush x:Name="localVideoBrush" />
                         </Grid.Background>
@@ -109,6 +111,16 @@
                     <TextBlock Text="测试视频:"/>
                     <Grid Height="320" Width="320" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" x:Name="testVideo">
                         
+                    </Grid>
+                </StackPanel>
+                <StackPanel Orientation="Vertical" Grid.Column="3" Grid.Row="0">
+                    <TextBlock Text="本地视频："/>
+                    <Grid Height="320" Width="320" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" x:Name="localVideo">
+                    </Grid>
+                </StackPanel>
+                <StackPanel Orientation="Vertical" Grid.Column="4" Grid.Row="0" >
+                    <TextBlock Text="远程视频:"/>
+                    <Grid Height="320" Width="320" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" x:Name="remoteVideo">
                     </Grid>
                 </StackPanel>
             </Grid>
