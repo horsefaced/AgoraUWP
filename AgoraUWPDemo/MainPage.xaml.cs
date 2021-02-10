@@ -1,8 +1,14 @@
 ﻿using AgoraUWP;
 using AgoraWinRT;
+using Microsoft.Graphics.Canvas;
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
+using Windows.Graphics.Capture;
+using Windows.Graphics.DirectX;
+using Windows.Graphics.Imaging;
 using Windows.Media;
 using Windows.Media.Audio;
 using Windows.Media.Capture;
@@ -10,9 +16,11 @@ using Windows.Media.Capture.Frames;
 using Windows.Media.MediaProperties;
 using Windows.Media.Render;
 using Windows.Storage.Streams;
+using Windows.UI.Core;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Media;
+using Windows.UI.Xaml.Media.Imaging;
 
 namespace AgoraUWPDemo
 {
@@ -40,6 +48,9 @@ namespace AgoraUWPDemo
         private AudioFrameInputNode m_audioInput;
         private Dictionary<int, Action> m_modes;
         private bool isAudioMuted = false;
+
+        private CanvasDevice screenCaptureCanasDevice = new CanvasDevice();
+
         private bool AudioMuted
         {
             get => isAudioMuted;
@@ -313,40 +324,63 @@ namespace AgoraUWPDemo
         /// <param name="e"></param>
         private async void TestCode(object sender, RoutedEventArgs e)
         {
-            //engine.SetRemoteRenderMode(remoteUser, RENDER_MODE_TYPE.RENDER_MODE_FILL, VIDEO_MIRROR_MODE_TYPE.VIDEO_MIRROR_MODE_DISABLED);
-            //localVideoEnabled = !localVideoEnabled;
-            //engine.EnableLocalVideo(localVideoEnabled);    
-            //log("Set External Video Source", engine.SetExternalVideoSource(localVideoEnabled, false));
-            //Clean();
-            using (AudioDeviceManager manager = engine.GetAudioDeviceManager())
+            var picker = new GraphicsCapturePicker();
+            captureItem = await picker.PickSingleItemAsync();
+            if (captureItem != null)
             {
-                using (var collection = manager.enumeratePlaybackDevices())
+                if (localVideoBrush.ImageSource == null) localVideoBrush.ImageSource = new SoftwareBitmapSource();
+
+                captureFramePool = Direct3D11CaptureFramePool.Create(screenCaptureCanasDevice, DirectXPixelFormat.B8G8R8A8UIntNormalized, 2, captureItem.Size);
+                captureFramePool.FrameArrived += ScreeCaptureFrameArrivedEvent;
+                captureItem.Closed += ScreenCaptureClosedEvent;
+                captureSession = captureFramePool.CreateCaptureSession(captureItem);
+                captureSession.StartCapture();
+
+                screenCaptureTask = Task.Factory.StartNew(() =>
                 {
-                    for (int i = 0; i < collection.GetCount(); i++)
+                    while(true)
                     {
-                        collection.GetDevice(i, out string name, out string id);
-                        log(String.Format("audio device's name is {0} and id is {1} in ", name, id), i);
+                        _= localVideoBrush.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, async () =>
+                        {
+                            if (running) return;
+                            running = true;
+
+                            SoftwareBitmap tmp;
+                            SoftwareBitmapSource source = (SoftwareBitmapSource)localVideoBrush.ImageSource;
+                            while ((tmp = Interlocked.Exchange(ref backBuffer, null)) != null)
+                            {
+                                await source.SetBitmapAsync(tmp);
+                                tmp.Dispose();
+                            }
+
+                            running = false;
+                        });
                     }
-                }
-                using (var collection = manager.enumerateRecordingDevices())
-                {
-                    for (int i = 0; i < collection.GetCount(); i++)
-                    {
-                        collection.GetDevice(i, out string name, out string id);
-                        log(string.Format("recording device's name is {0} and id is {1} in ", name, id), i);
-                    }
-                }
+                });
             }
-            using (var manager = engine.GetVideoDeviceManager())
-            using (var collection = await manager.EnumerateVideoDevices())
+        }
+
+        private void ScreenCaptureClosedEvent(GraphicsCaptureItem sender, object args)
+        {
+            throw new NotImplementedException();
+        }
+
+        private bool running = false;
+        private SoftwareBitmap backBuffer;
+        private GraphicsCaptureItem captureItem;
+        private Direct3D11CaptureFramePool captureFramePool;
+        private GraphicsCaptureSession captureSession;
+        private Task screenCaptureTask;
+
+        private void ScreeCaptureFrameArrivedEvent(Direct3D11CaptureFramePool sender, object args)
+        {
+            using (var frame = sender.TryGetNextFrame())
             {
-                for (int i = 0; i < collection.GetCount(); i++)
-                {
-                    collection.GetDevice(i, out string name, out string id);
-                    log(string.Format("video device's name is {0} and id is {1} in ", name, id), i);
-                }
-                manager.StartDeviceTest(new ImageBrushVideoCanvas { Target = testVideoBrush, RenderMode = RENDER_MODE_TYPE.RENDER_MODE_FILL, MirrorMode = VIDEO_MIRROR_MODE_TYPE.VIDEO_MIRROR_MODE_ENABLED });
-            }            
+                var bitmap = SoftwareBitmap.CreateCopyFromSurfaceAsync(frame.Surface, BitmapAlphaMode.Ignore).AsTask().GetAwaiter().GetResult();
+                bitmap = SoftwareBitmap.Convert(bitmap, BitmapPixelFormat.Bgra8, BitmapAlphaMode.Ignore);
+                bitmap = Interlocked.Exchange(ref backBuffer, bitmap);
+                bitmap?.Dispose();
+            }
         }
 
         /// <summary>
