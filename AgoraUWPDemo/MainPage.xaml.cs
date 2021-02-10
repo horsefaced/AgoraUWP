@@ -1,9 +1,13 @@
 ﻿using AgoraUWP;
 using AgoraWinRT;
 using Microsoft.Graphics.Canvas;
+using Microsoft.Graphics.Canvas.Effects;
+using Microsoft.Graphics.Canvas.UI.Composition;
 using System;
 using System.Collections.Generic;
+using System.Numerics;
 using System.Runtime.InteropServices;
+using System.Runtime.InteropServices.WindowsRuntime;
 using System.Threading;
 using System.Threading.Tasks;
 using Windows.Graphics.Capture;
@@ -16,9 +20,12 @@ using Windows.Media.Capture.Frames;
 using Windows.Media.MediaProperties;
 using Windows.Media.Render;
 using Windows.Storage.Streams;
+using Windows.UI;
+using Windows.UI.Composition;
 using Windows.UI.Core;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
+using Windows.UI.Xaml.Hosting;
 using Windows.UI.Xaml.Media;
 using Windows.UI.Xaml.Media.Imaging;
 
@@ -48,8 +55,6 @@ namespace AgoraUWPDemo
         private AudioFrameInputNode m_audioInput;
         private Dictionary<int, Action> m_modes;
         private bool isAudioMuted = false;
-
-        private CanvasDevice screenCaptureCanasDevice = new CanvasDevice();
 
         private bool AudioMuted
         {
@@ -127,6 +132,18 @@ namespace AgoraUWPDemo
             btnMuteAudio.Click += MuteAudio;
             btnMuteVideo.Click += MuteVideo;
             btnTest.Click += TestCode;
+            btnScreenCapture.Click += ScreenCapture;
+        }
+
+        private void ScreenCapture(object sender, RoutedEventArgs e)
+        {
+            var action = m_modes[cbMediaMode.SelectedIndex];
+            action?.Invoke();
+            this.log("set channel profile", this.engine.SetChannelProfile(AgoraWinRT.CHANNEL_PROFILE_TYPE.CHANNEL_PROFILE_LIVE_BROADCASTING));
+            this.log("set client role", this.engine.SetClientRole(AgoraWinRT.CLIENT_ROLE_TYPE.CLIENT_ROLE_BROADCASTER));
+            this.engine.SetExternalVideoSource(true, false);
+            this.engine.EnableVideo();
+            log("join channel", this.engine.JoinChannel(txtChannelToken.Text, txtChannelName.Text, "", 0));
         }
 
         private void MuteVideo(object sender, RoutedEventArgs e)
@@ -317,6 +334,16 @@ namespace AgoraUWPDemo
             }
         }
 
+        private CanvasDevice screenCaptureCanvasDevice = new CanvasDevice();
+        private bool running = false;
+        private SoftwareBitmap backBuffer;
+        private SoftwareBitmap backNBuffer;
+        private GraphicsCaptureItem captureItem;
+        private Direct3D11CaptureFramePool captureFramePool;
+        private GraphicsCaptureSession captureSession;
+        private Task screenCaptureTask;
+        private CompositionDrawingSurface screenCaptureSurface;
+
         /// <summary>
         /// 一些测试代码，可以不用关心。
         /// </summary>
@@ -330,13 +357,23 @@ namespace AgoraUWPDemo
             {
                 if (localVideoBrush.ImageSource == null) localVideoBrush.ImageSource = new SoftwareBitmapSource();
 
-                captureFramePool = Direct3D11CaptureFramePool.Create(screenCaptureCanasDevice, DirectXPixelFormat.B8G8R8A8UIntNormalized, 2, captureItem.Size);
+                var graphicsDevice = CanvasComposition.CreateCompositionGraphicsDevice(Window.Current.Compositor, screenCaptureCanvasDevice);
+                int width = captureItem.Size.Width, height = captureItem.Size.Height;
+                width = width % 2 == 0 ? width : width + 1;
+                height = height % 2 == 0 ? height : height + 1;
+                screenCaptureSurface = graphicsDevice.CreateDrawingSurface(new Windows.Foundation.Size(width, height), DirectXPixelFormat.B8G8R8A8UIntNormalized, DirectXAlphaMode.Premultiplied);
+                var visual = Window.Current.Compositor.CreateSpriteVisual();
+                visual.RelativeSizeAdjustment = Vector2.One;
+                visual.Brush = Window.Current.Compositor.CreateSurfaceBrush(screenCaptureSurface);
+                ElementCompositionPreview.SetElementChildVisual(testVideo, visual);
+
+                captureFramePool = Direct3D11CaptureFramePool.Create(screenCaptureCanvasDevice, DirectXPixelFormat.B8G8R8A8UIntNormalized, 2, captureItem.Size);
                 captureFramePool.FrameArrived += ScreeCaptureFrameArrivedEvent;
                 captureItem.Closed += ScreenCaptureClosedEvent;
                 captureSession = captureFramePool.CreateCaptureSession(captureItem);
                 captureSession.StartCapture();
 
-                screenCaptureTask = Task.Factory.StartNew(() =>
+                /*screenCaptureTask = Task.Factory.StartNew(() =>
                 {
                     while(true)
                     {
@@ -356,7 +393,7 @@ namespace AgoraUWPDemo
                             running = false;
                         });
                     }
-                });
+                });*/
             }
         }
 
@@ -365,21 +402,59 @@ namespace AgoraUWPDemo
             throw new NotImplementedException();
         }
 
-        private bool running = false;
-        private SoftwareBitmap backBuffer;
-        private GraphicsCaptureItem captureItem;
-        private Direct3D11CaptureFramePool captureFramePool;
-        private GraphicsCaptureSession captureSession;
-        private Task screenCaptureTask;
-
         private void ScreeCaptureFrameArrivedEvent(Direct3D11CaptureFramePool sender, object args)
         {
             using (var frame = sender.TryGetNextFrame())
             {
-                var bitmap = SoftwareBitmap.CreateCopyFromSurfaceAsync(frame.Surface, BitmapAlphaMode.Ignore).AsTask().GetAwaiter().GetResult();
-                bitmap = SoftwareBitmap.Convert(bitmap, BitmapPixelFormat.Bgra8, BitmapAlphaMode.Ignore);
-                bitmap = Interlocked.Exchange(ref backBuffer, bitmap);
-                bitmap?.Dispose();
+                CanvasBitmap bitmap = CanvasBitmap.CreateFromDirect3D11Surface(screenCaptureCanvasDevice, frame.Surface);
+                using (CanvasDrawingSession session = CanvasComposition.CreateDrawingSession(screenCaptureSurface))
+                {
+                    session.Clear(Colors.Transparent);
+                    session.DrawImage(bitmap);
+                }
+                var b = SoftwareBitmap.CreateCopyFromSurfaceAsync(frame.Surface, BitmapAlphaMode.Ignore).AsTask().GetAwaiter().GetResult();
+                b = Interlocked.Exchange(ref backBuffer, b);
+                b?.Dispose();
+
+                Task.Factory.StartNew(() =>
+                {
+                    if (running) return;
+                    running = true;
+                    using (var b = Interlocked.Exchange(ref backBuffer, null))
+                    {
+                        using (var a = Resize(b, b.PixelWidth % 2 == 0 ? b.PixelWidth : b.PixelWidth + 1, b.PixelHeight % 2 == 0 ? b.PixelHeight : b.PixelHeight + 1))
+                        using (var n = SoftwareBitmap.Convert(a, BitmapPixelFormat.Nv12))
+                        using (var externalFrame = new ExternalVideoFrame())
+                        {
+                            var nbuffer = new Windows.Storage.Streams.Buffer((uint)(n.PixelWidth * n.PixelHeight * 3 / 2));
+                            n.CopyToBuffer(nbuffer);
+                            externalFrame.format = VIDEO_PIXEL_FORMAT.VIDEO_PIXEL_NV12;
+                            externalFrame.type = VIDEO_BUFFER_TYPE.VIDEO_BUFFER_RAW_DATA;
+                            externalFrame.stride = (uint)n.PixelWidth;
+                            externalFrame.height = (uint)n.PixelHeight;
+
+                            externalFrame.buffer = nbuffer.ToArray();
+                            this.engine.PushVideoFrame(externalFrame);
+                        }
+                    }
+                    running = false;
+                });
+            }
+        }
+
+        public SoftwareBitmap Resize(SoftwareBitmap softwareBitmap, float newWidth, float newHeight)
+        {
+            using (var resourceCreator = CanvasDevice.GetSharedDevice())
+            using (var canvasBitmap = CanvasBitmap.CreateFromSoftwareBitmap(resourceCreator, softwareBitmap))
+            using (var canvasRenderTarget = new CanvasRenderTarget(resourceCreator, newWidth, newHeight, canvasBitmap.Dpi))
+            using (var drawingSession = canvasRenderTarget.CreateDrawingSession())
+            using (var scaleEffect = new ScaleEffect())
+            {
+                scaleEffect.Source = canvasBitmap;
+                scaleEffect.Scale = new System.Numerics.Vector2(newWidth / softwareBitmap.PixelWidth, newHeight / softwareBitmap.PixelHeight);
+                drawingSession.DrawImage(scaleEffect);
+                drawingSession.Flush();
+                return SoftwareBitmap.CreateCopyFromBuffer(canvasRenderTarget.GetPixelBytes().AsBuffer(), BitmapPixelFormat.Bgra8, (int)newWidth, (int)newHeight, BitmapAlphaMode.Premultiplied);
             }
         }
 

@@ -22,11 +22,11 @@
                     <RowDefinition Height="auto" MinHeight="200"></RowDefinition>
                 </Grid.RowDefinitions>
                 <TextBlock Text="Vendor Key:" Grid.Column="0" Grid.Row="0" />
-                <TextBox x:Name="txtVendorKey" Grid.Column="1" Grid.Row="0" HorizontalAlignment="Stretch" Text="3d09433bedce4d68b50d444772728d0d" />
+                <TextBox x:Name="txtVendorKey" Grid.Column="1" Grid.Row="0" HorizontalAlignment="Stretch" Text="c021e195268048418d8176e3d7a8e8bd" />
                 <TextBlock Text="Channel Name:" Grid.Column="0" Grid.Row="1"/>
                 <TextBox x:Name="txtChannelName" Grid.Column="1" Grid.Row="1" HorizontalAlignment="Stretch" Text="666"/>
                 <TextBlock Text="Channel Token:" Grid.Column="0" Grid.Row="2"/>
-                <TextBox x:Name="txtChannelToken" Grid.Column="1" Grid.Row="2" HorizontalAlignment="Stretch" Text="" />
+                <TextBox x:Name="txtChannelToken" Grid.Column="1" Grid.Row="2" HorizontalAlignment="Stretch" Text="006c021e195268048418d8176e3d7a8e8bdIAAiT5AvKWCxEOnFqT5byXMnAX84QjfAZx5pJdgqh4I5ydxEAZkAAAAAEABwjq6P46ckYAEAAQDipyRg" />
                 <TextBlock Text="调用结果:" Grid.Column="0" Grid.Row="3"/>
                 <TextBox x:Name="txtResult" Grid.Column="1" Grid.Row="3" 
                      HorizontalAlignment="Stretch" MaxHeight="200" AcceptsReturn="True" 
@@ -91,7 +91,7 @@
                 </Grid.RowDefinitions>
                 <StackPanel Orientation="Vertical" Grid.Column="0" Grid.Row="0">
                     <TextBlock Text="本地视频："/>
-                    <Grid Height="320" Width="320" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                    <Grid Height="320" Width="320" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" x:Name="localVideo">
                         <Grid.Background>
                             <ImageBrush x:Name="localVideoBrush" />
                         </Grid.Background>
@@ -107,10 +107,8 @@
                 </StackPanel>
                 <StackPanel Orientation="Vertical" Grid.Column="2" Grid.Row="0" >
                     <TextBlock Text="测试视频:"/>
-                    <Grid Height="320" Width="320" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
-                        <Grid.Background>
-                            <ImageBrush x:Name="testVideoBrush" />
-                        </Grid.Background>
+                    <Grid Height="320" Width="320" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" x:Name="testVideo">
+                        
                     </Grid>
                 </StackPanel>
             </Grid>
