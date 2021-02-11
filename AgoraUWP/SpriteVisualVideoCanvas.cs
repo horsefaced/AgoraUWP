@@ -14,6 +14,7 @@ using Windows.UI;
 using Windows.UI.Composition;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Hosting;
+using Windows.UI.Xaml.Media;
 
 namespace AgoraUWP
 {
@@ -67,6 +68,18 @@ namespace AgoraUWP
             set
             {
                 base.RenderMode = value;
+                var brush = this.visual.Brush as CompositionSurfaceBrush;
+                brush.Stretch = GetStretch();
+            }
+        }
+        private CompositionStretch GetStretch()
+        {
+            switch (RenderMode)
+            {
+                case RENDER_MODE_TYPE.RENDER_MODE_FIT: return CompositionStretch.Uniform;
+                case RENDER_MODE_TYPE.RENDER_MODE_HIDDEN: return CompositionStretch.UniformToFill;
+                case RENDER_MODE_TYPE.RENDER_MODE_FILL: return CompositionStretch.Fill;
+                default: return CompositionStretch.None;
             }
         }
 
@@ -86,6 +99,8 @@ namespace AgoraUWP
         public override void Render(VideoFrame frame)
         {
             if (this.target == null) return;
+
+            CanvasComposition.Resize(this.surface, new Size(frame.width, frame.height));
             var nvBuffer = Utils.ConvertToNv12(frame);
             using (var image = Utils.ConvertToImage(nvBuffer, (int)frame.width, (int)frame.height))
             using (var bitmap = CanvasBitmap.CreateFromSoftwareBitmap(this.canvasDevice, image))
@@ -101,11 +116,14 @@ namespace AgoraUWP
             if (this.target == null) return;
 
             using (var softwareBitmap = Utils.ConvertToImage(frame?.VideoMediaFrame))
-            using (var bitmap = CanvasBitmap.CreateFromSoftwareBitmap(this.canvasDevice, softwareBitmap))
-            using (var session = CanvasComposition.CreateDrawingSession(this.surface))
             {
-                session.Clear(Colors.Transparent);
-                session.DrawImage(bitmap);
+                CanvasComposition.Resize(this.surface, new Size(softwareBitmap.PixelWidth, softwareBitmap.PixelHeight));
+                using (var bitmap = CanvasBitmap.CreateFromSoftwareBitmap(this.canvasDevice, softwareBitmap))
+                using (var session = CanvasComposition.CreateDrawingSession(this.surface))
+                {
+                    session.Clear(Colors.Transparent);
+                    session.DrawImage(bitmap);
+                }
             }
         }
     }

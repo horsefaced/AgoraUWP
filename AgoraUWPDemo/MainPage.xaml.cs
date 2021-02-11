@@ -133,18 +133,39 @@ namespace AgoraUWPDemo
             btnMuteVideo.Click += MuteVideo;
             btnTest.Click += TestCode;
             btnScreenCapture.Click += ScreenCapture;
+            
             btnMirrorLocalVideo.Checked += MirrorLocalVideo;
             btnMirrorLocalVideo.Unchecked += UnMirrorLocalVideo;
+
+            cbLocalVideoRenderMode.SelectionChanged += RenderLocalVideoMode;
+        }
+
+        private void RenderLocalVideoMode(object sender, SelectionChangedEventArgs e)
+        {
+            this.ChangeLocalRenderMode();
+        }
+
+        private void ChangeLocalRenderMode()
+        {
+            var mirrorMode = btnMirrorLocalVideo.IsChecked.GetValueOrDefault(false) ? VIDEO_MIRROR_MODE_TYPE.VIDEO_MIRROR_MODE_ENABLED : VIDEO_MIRROR_MODE_TYPE.VIDEO_MIRROR_MODE_DISABLED;
+            var renderMode = RENDER_MODE_TYPE.RENDER_MODE_ADAPTIVE;
+            switch(cbLocalVideoRenderMode.SelectedIndex)
+            {
+                case 0: renderMode = RENDER_MODE_TYPE.RENDER_MODE_FIT; break;
+                case 1: renderMode = RENDER_MODE_TYPE.RENDER_MODE_HIDDEN; break;
+                case 2: renderMode = RENDER_MODE_TYPE.RENDER_MODE_FILL; break;
+            }
+            this.engine?.SetLocalRenderMode(renderMode, mirrorMode);
         }
 
         private void UnMirrorLocalVideo(object sender, RoutedEventArgs e)
         {
-            this.engine?.SetLocalRenderMode(RENDER_MODE_TYPE.RENDER_MODE_FIT, VIDEO_MIRROR_MODE_TYPE.VIDEO_MIRROR_MODE_DISABLED);
+            this.ChangeLocalRenderMode();
         }
 
         private void MirrorLocalVideo(object sender, RoutedEventArgs e)
         {
-            this.engine?.SetLocalRenderMode(RENDER_MODE_TYPE.RENDER_MODE_FIT, VIDEO_MIRROR_MODE_TYPE.VIDEO_MIRROR_MODE_ENABLED);
+            this.ChangeLocalRenderMode();
         }
 
         private void ScreenCapture(object sender, RoutedEventArgs e)
