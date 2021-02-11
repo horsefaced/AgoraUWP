@@ -40,6 +40,36 @@ namespace AgoraUWP
             this.visual.Brush = this.compositor.CreateSurfaceBrush(this.surface);
         }
 
+        public override VIDEO_MIRROR_MODE_TYPE MirrorMode
+        {
+            get => base.MirrorMode;
+            set
+            {
+                base.MirrorMode = value;
+                if (value == VIDEO_MIRROR_MODE_TYPE.VIDEO_MIRROR_MODE_ENABLED)
+                {
+                    this.visual.RotationAxis = new Vector3(0, 1, 0);
+                    this.visual.RelativeOffsetAdjustment = new Vector3(1, 0, 0);
+                    this.visual.RotationAngleInDegrees = 180;
+                }
+                else
+                {
+                    this.visual.RotationAxis = new Vector3(0, 1, 0);
+                    this.visual.RelativeOffsetAdjustment = new Vector3(0, 0, 0);
+                    this.visual.RotationAngleInDegrees = 0;
+                }
+            }
+        }
+
+        public override RENDER_MODE_TYPE RenderMode
+        {
+            get => base.RenderMode;
+            set
+            {
+                base.RenderMode = value;
+            }
+        }
+
         public override object Target
         {
             get => this.target;

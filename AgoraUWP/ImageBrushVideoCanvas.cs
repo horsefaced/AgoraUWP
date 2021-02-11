@@ -18,7 +18,7 @@ namespace AgoraUWP
         private SoftwareBitmapSource source;
         private ScaleTransform mirrorTransform;
         private RotateTransform rotateTransform;
-        private TransformGroup tranforms;
+        private TransformGroup transform;
         private SoftwareBitmap backBuffer;
         private bool running;
         private ushort oldRotation;
@@ -36,9 +36,9 @@ namespace AgoraUWP
             rotateTransform.Angle = 0;
 
 
-            tranforms = new TransformGroup();
-            tranforms.Children.Add(this.rotateTransform);
-            tranforms.Children.Add(this.mirrorTransform);
+            transform = new TransformGroup();
+            transform.Children.Add(this.rotateTransform);
+            transform.Children.Add(this.mirrorTransform);
         }
         public override RENDER_MODE_TYPE RenderMode
         {
@@ -64,13 +64,13 @@ namespace AgoraUWP
         {
             get => target;
             set
-            {
+            { 
                 target = value as ImageBrush;
                 if (target != null)
                 {
                     target.ImageSource = new SoftwareBitmapSource();
                     source = (SoftwareBitmapSource)target.ImageSource;
-                    target.RelativeTransform = tranforms;
+                    target.RelativeTransform = transform;
                     target.Stretch = GetStretch();
                 }
             }

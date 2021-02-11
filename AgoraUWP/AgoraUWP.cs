@@ -192,8 +192,11 @@ namespace AgoraUWP
         }
         public void SetLocalRenderMode(RENDER_MODE_TYPE renderMode, VIDEO_MIRROR_MODE_TYPE mirrorMode)
         {
-            localVideo.RenderMode = renderMode;
-            localVideo.MirrorMode = mirrorMode;
+            if (localVideo != null)
+            {
+                localVideo.RenderMode = renderMode;
+                localVideo.MirrorMode = mirrorMode;
+            }
         }
         public void SetRemoteRenderMode(ulong uid, RENDER_MODE_TYPE renderMode, VIDEO_MIRROR_MODE_TYPE mirrorMode)
         {
