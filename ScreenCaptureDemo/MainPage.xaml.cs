@@ -78,7 +78,6 @@ namespace ScreenCaptureDemo
                     degradationPreference = DEGRADATION_PREFERENCE.MAINTAIN_QUALITY,
                     mirrorMode = VIDEO_MIRROR_MODE_TYPE.VIDEO_MIRROR_MODE_DISABLED,
                 }));
-            this.log("set external video source", this.engine.SetExternalVideoSource(true, false));
             this.log("enable video", this.engine.EnableVideo());
             this.log("disable audio", this.engine.DisableAudio());
             this.log("disable lastmile test", this.engine.DisableLastmileTest());

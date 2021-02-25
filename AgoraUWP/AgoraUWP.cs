@@ -259,6 +259,9 @@ namespace AgoraUWP
         public async Task StartScreenCapture()
         {
             StopScreenCapture();
+
+            SetExternalVideoSource(true, false);
+
             var picker = new GraphicsCapturePicker();
             var captureItem = await picker.PickSingleItemAsync();
             if (captureItem != null)
