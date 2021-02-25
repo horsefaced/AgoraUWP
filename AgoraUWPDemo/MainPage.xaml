@@ -26,7 +26,7 @@
                 <TextBlock Text="Channel Name:" Grid.Column="0" Grid.Row="1"/>
                 <TextBox x:Name="txtChannelName" Grid.Column="1" Grid.Row="1" HorizontalAlignment="Stretch" Text="666"/>
                 <TextBlock Text="Channel Token:" Grid.Column="0" Grid.Row="2"/>
-                <TextBox x:Name="txtChannelToken" Grid.Column="1" Grid.Row="2" HorizontalAlignment="Stretch" Text="006c021e195268048418d8176e3d7a8e8bdIAAiT5AvKWCxEOnFqT5byXMnAX84QjfAZx5pJdgqh4I5ydxEAZkAAAAAEABwjq6P46ckYAEAAQDipyRg" />
+                <TextBox x:Name="txtChannelToken" Grid.Column="1" Grid.Row="2" HorizontalAlignment="Stretch" Text="006c021e195268048418d8176e3d7a8e8bdIAAMn2i3N5Hu1P7twl6w4GLzP2i7BGEfscjvIF05M5M5NtxEAZkAAAAAEABD1GaPhXk4YAEAAQCEeThg" />
                 <TextBlock Text="调用结果:" Grid.Column="0" Grid.Row="3"/>
                 <TextBox x:Name="txtResult" Grid.Column="1" Grid.Row="3" 
                      HorizontalAlignment="Stretch" MaxHeight="200" AcceptsReturn="True" 

@@ -256,7 +256,7 @@ namespace AgoraUWP
             }
         }
 
-        public async void StartScreenCapture()
+        public async Task StartScreenCapture()
         {
             StopScreenCapture();
             var picker = new GraphicsCapturePicker();

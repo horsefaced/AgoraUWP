@@ -198,7 +198,7 @@ namespace AgoraUWPDemo
                 RenderMode = RENDER_MODE_TYPE.RENDER_MODE_FIT,
                 MirrorMode = btnMirrorLocalVideo.IsChecked.GetValueOrDefault(false) ? VIDEO_MIRROR_MODE_TYPE.VIDEO_MIRROR_MODE_ENABLED : VIDEO_MIRROR_MODE_TYPE.VIDEO_MIRROR_MODE_DISABLED
             });
-            this.screenEngine.StartScreenCapture();
+            await screenEngine.StartScreenCapture();
         }
 
         private void MuteVideo(object sender, RoutedEventArgs e)
@@ -398,7 +398,8 @@ namespace AgoraUWPDemo
         /// <param name="e"></param>
         private async void TestCode(object sender, RoutedEventArgs e)
         {
-
+            var uri = new Uri($"asc://{txtChannelName.Text}?key={txtVendorKey.Text}&token={txtChannelToken.Text}&uid=666");
+            var success = await Windows.System.Launcher.LaunchUriAsync(uri);
         }
 
         /// <summary>
