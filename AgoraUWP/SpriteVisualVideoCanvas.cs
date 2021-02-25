@@ -8,7 +8,9 @@ using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
 using Windows.Foundation;
+using Windows.Graphics.Capture;
 using Windows.Graphics.DirectX;
+using Windows.Graphics.Imaging;
 using Windows.Media.Capture.Frames;
 using Windows.UI;
 using Windows.UI.Composition;
@@ -125,6 +127,26 @@ namespace AgoraUWP
                     session.DrawImage(bitmap);
                 }
             }
+        }
+
+        public override void Render(SoftwareBitmap b)
+        {
+            if (this.target == null) return;
+
+            CanvasComposition.Resize(this.surface, new Size(b.PixelWidth, b.PixelHeight));
+            using (var bitmap = CanvasBitmap.CreateFromSoftwareBitmap(this.canvasDevice, b))
+            using (var session = CanvasComposition.CreateDrawingSession(this.surface))
+            {
+                session.Clear(Colors.Transparent);
+                session.DrawImage(bitmap);
+            }
+        }
+
+        public override void Dispose()
+        {
+            visual?.Dispose();
+            surface?.Dispose();
+            canvasDevice?.Dispose();
         }
     }
 }

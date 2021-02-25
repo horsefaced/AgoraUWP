@@ -44,12 +44,15 @@ namespace AgoraUWPDemo
     /// </summary>
     public sealed partial class MainPage : Page
     {
+        private static readonly ulong SCREEN_UID = 666;
 
         private static readonly uint DEFAULT_BITS_PER_SAMPLE = 16;
         private static readonly uint DEFAULT_CHANNEL_COUNT = 1;
         private static readonly uint DEFAULT_SAMPLE_RATE = 48000;
 
         private AgoraUWP.AgoraRtc engine;
+        private AgoraUWP.AgoraRtc screenEngine;
+
         private IMediaCapturer m_audioCapture;
         private AudioGraph m_audioGraph;
         private AudioFrameInputNode m_audioInput;
@@ -133,7 +136,7 @@ namespace AgoraUWPDemo
             btnMuteVideo.Click += MuteVideo;
             btnTest.Click += TestCode;
             btnScreenCapture.Click += ScreenCapture;
-            
+
             btnMirrorLocalVideo.Checked += MirrorLocalVideo;
             btnMirrorLocalVideo.Unchecked += UnMirrorLocalVideo;
 
@@ -149,13 +152,14 @@ namespace AgoraUWPDemo
         {
             var mirrorMode = btnMirrorLocalVideo.IsChecked.GetValueOrDefault(false) ? VIDEO_MIRROR_MODE_TYPE.VIDEO_MIRROR_MODE_ENABLED : VIDEO_MIRROR_MODE_TYPE.VIDEO_MIRROR_MODE_DISABLED;
             var renderMode = RENDER_MODE_TYPE.RENDER_MODE_ADAPTIVE;
-            switch(cbLocalVideoRenderMode.SelectedIndex)
+            switch (cbLocalVideoRenderMode.SelectedIndex)
             {
                 case 0: renderMode = RENDER_MODE_TYPE.RENDER_MODE_FIT; break;
                 case 1: renderMode = RENDER_MODE_TYPE.RENDER_MODE_HIDDEN; break;
                 case 2: renderMode = RENDER_MODE_TYPE.RENDER_MODE_FILL; break;
             }
             this.engine?.SetLocalRenderMode(renderMode, mirrorMode);
+            this.screenEngine?.SetLocalScreenVideoRenderMode(renderMode, mirrorMode);
         }
 
         private void UnMirrorLocalVideo(object sender, RoutedEventArgs e)
@@ -168,15 +172,33 @@ namespace AgoraUWPDemo
             this.ChangeLocalRenderMode();
         }
 
-        private void ScreenCapture(object sender, RoutedEventArgs e)
+        private async void ScreenCapture(object sender, RoutedEventArgs e)
         {
-            var action = m_modes[cbMediaMode.SelectedIndex];
-            action?.Invoke();
-            this.log("set channel profile", this.engine.SetChannelProfile(AgoraWinRT.CHANNEL_PROFILE_TYPE.CHANNEL_PROFILE_LIVE_BROADCASTING));
-            this.log("set client role", this.engine.SetClientRole(AgoraWinRT.CLIENT_ROLE_TYPE.CLIENT_ROLE_BROADCASTER));
-            this.engine.SetExternalVideoSource(true, false);
-            this.engine.EnableVideo();
-            log("join channel", this.engine.JoinChannel(txtChannelToken.Text, txtChannelName.Text, "", 0));
+            if (this.screenEngine != null)
+            {
+                this.screenEngine.LeaveChannel();
+                this.screenEngine.Dispose();
+                this.screenEngine = null;
+            }
+
+            this.screenEngine = new AgoraUWP.AgoraRtc(txtVendorKey.Text);
+            this.log("set external video source", this.screenEngine.SetExternalVideoSource(true, false));
+            this.log("enable video", this.screenEngine.EnableVideo());
+            this.log("disable audio", this.screenEngine.DisableAudio());
+            this.log("disable lastmile test", this.screenEngine.DisableLastmileTest());
+            this.log("set channel profile", this.screenEngine.SetChannelProfile(AgoraWinRT.CHANNEL_PROFILE_TYPE.CHANNEL_PROFILE_LIVE_BROADCASTING));
+            this.log("set client role", this.screenEngine.SetClientRole(AgoraWinRT.CLIENT_ROLE_TYPE.CLIENT_ROLE_BROADCASTER));
+            this.log("mute all remote audio", this.screenEngine.MuteAllRemoteAudioStreams(true));
+            this.log("mute all remote video", this.screenEngine.MuteAllRemoteVideoStream(true));
+            this.log("join channel", this.screenEngine.JoinChannel(txtChannelToken.Text, txtChannelName.Text, "", SCREEN_UID));
+
+            this.screenEngine.SetupLocalScreenVideo(new SpriteVisualVideoCanvas
+            {
+                Target = screenVideo,
+                RenderMode = RENDER_MODE_TYPE.RENDER_MODE_FIT,
+                MirrorMode = btnMirrorLocalVideo.IsChecked.GetValueOrDefault(false) ? VIDEO_MIRROR_MODE_TYPE.VIDEO_MIRROR_MODE_ENABLED : VIDEO_MIRROR_MODE_TYPE.VIDEO_MIRROR_MODE_DISABLED
+            });
+            this.screenEngine.StartScreenCapture();
         }
 
         private void MuteVideo(object sender, RoutedEventArgs e)
@@ -208,7 +230,7 @@ namespace AgoraUWPDemo
                 Target = localVideo,
                 RenderMode = RENDER_MODE_TYPE.RENDER_MODE_FIT,
                 MirrorMode = btnMirrorLocalVideo.IsChecked.GetValueOrDefault(false) ? VIDEO_MIRROR_MODE_TYPE.VIDEO_MIRROR_MODE_ENABLED : VIDEO_MIRROR_MODE_TYPE.VIDEO_MIRROR_MODE_DISABLED
-            }) ;
+            });
             this.log("enable video", this.engine.EnableVideo());
             this.engine.StartPreview();
             log("join channel", this.engine.JoinChannel(txtChannelToken.Text, txtChannelName.Text, "", 0));
@@ -367,15 +389,7 @@ namespace AgoraUWPDemo
             }
         }
 
-        private CanvasDevice screenCaptureCanvasDevice = new CanvasDevice();
-        private bool running = false;
-        private SoftwareBitmap backBuffer;
-        private SoftwareBitmap backNBuffer;
-        private GraphicsCaptureItem captureItem;
-        private Direct3D11CaptureFramePool captureFramePool;
-        private GraphicsCaptureSession captureSession;
-        private Task screenCaptureTask;
-        private CompositionDrawingSurface screenCaptureSurface;
+
 
         /// <summary>
         /// 一些测试代码，可以不用关心。
@@ -384,111 +398,7 @@ namespace AgoraUWPDemo
         /// <param name="e"></param>
         private async void TestCode(object sender, RoutedEventArgs e)
         {
-            var picker = new GraphicsCapturePicker();
-            captureItem = await picker.PickSingleItemAsync();
-            if (captureItem != null)
-            {
-                if (localVideoBrush.ImageSource == null) localVideoBrush.ImageSource = new SoftwareBitmapSource();
 
-                var graphicsDevice = CanvasComposition.CreateCompositionGraphicsDevice(Window.Current.Compositor, screenCaptureCanvasDevice);
-                int width = captureItem.Size.Width, height = captureItem.Size.Height;
-                width = width % 2 == 0 ? width : width + 1;
-                height = height % 2 == 0 ? height : height + 1;
-                screenCaptureSurface = graphicsDevice.CreateDrawingSurface(new Windows.Foundation.Size(width, height), DirectXPixelFormat.B8G8R8A8UIntNormalized, DirectXAlphaMode.Premultiplied);
-                var visual = Window.Current.Compositor.CreateSpriteVisual();
-                visual.RelativeSizeAdjustment = Vector2.One;
-                visual.Brush = Window.Current.Compositor.CreateSurfaceBrush(screenCaptureSurface);
-                ElementCompositionPreview.SetElementChildVisual(testVideo, visual);
-
-                captureFramePool = Direct3D11CaptureFramePool.Create(screenCaptureCanvasDevice, DirectXPixelFormat.B8G8R8A8UIntNormalized, 2, captureItem.Size);
-                captureFramePool.FrameArrived += ScreeCaptureFrameArrivedEvent;
-                captureItem.Closed += ScreenCaptureClosedEvent;
-                captureSession = captureFramePool.CreateCaptureSession(captureItem);
-                captureSession.StartCapture();
-
-                /*screenCaptureTask = Task.Factory.StartNew(() =>
-                {
-                    while(true)
-                    {
-                        _= localVideoBrush.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, async () =>
-                        {
-                            if (running) return;
-                            running = true;
-
-                            SoftwareBitmap tmp;
-                            SoftwareBitmapSource source = (SoftwareBitmapSource)localVideoBrush.ImageSource;
-                            while ((tmp = Interlocked.Exchange(ref backBuffer, null)) != null)
-                            {
-                                await source.SetBitmapAsync(tmp);
-                                tmp.Dispose();
-                            }
-
-                            running = false;
-                        });
-                    }
-                });*/
-            }
-        }
-
-        private void ScreenCaptureClosedEvent(GraphicsCaptureItem sender, object args)
-        {
-            throw new NotImplementedException();
-        }
-
-        private void ScreeCaptureFrameArrivedEvent(Direct3D11CaptureFramePool sender, object args)
-        {
-            using (var frame = sender.TryGetNextFrame())
-            {
-                CanvasBitmap bitmap = CanvasBitmap.CreateFromDirect3D11Surface(screenCaptureCanvasDevice, frame.Surface);
-                using (CanvasDrawingSession session = CanvasComposition.CreateDrawingSession(screenCaptureSurface))
-                {
-                    session.Clear(Colors.Transparent);
-                    session.DrawImage(bitmap);
-                }
-                var b = SoftwareBitmap.CreateCopyFromSurfaceAsync(frame.Surface, BitmapAlphaMode.Ignore).AsTask().GetAwaiter().GetResult();
-                b = Interlocked.Exchange(ref backBuffer, b);
-                b?.Dispose();
-
-                Task.Factory.StartNew(() =>
-                {
-                    if (running) return;
-                    running = true;
-                    using (var b = Interlocked.Exchange(ref backBuffer, null))
-                    {
-                        using (var a = Resize(b, b.PixelWidth % 2 == 0 ? b.PixelWidth : b.PixelWidth + 1, b.PixelHeight % 2 == 0 ? b.PixelHeight : b.PixelHeight + 1))
-                        using (var n = SoftwareBitmap.Convert(a, BitmapPixelFormat.Nv12))
-                        using (var externalFrame = new ExternalVideoFrame())
-                        {
-                            var nbuffer = new Windows.Storage.Streams.Buffer((uint)(n.PixelWidth * n.PixelHeight * 3 / 2));
-                            n.CopyToBuffer(nbuffer);
-                            externalFrame.format = VIDEO_PIXEL_FORMAT.VIDEO_PIXEL_NV12;
-                            externalFrame.type = VIDEO_BUFFER_TYPE.VIDEO_BUFFER_RAW_DATA;
-                            externalFrame.stride = (uint)n.PixelWidth;
-                            externalFrame.height = (uint)n.PixelHeight;
-
-                            externalFrame.buffer = nbuffer.ToArray();
-                            this.engine.PushVideoFrame(externalFrame);
-                        }
-                    }
-                    running = false;
-                });
-            }
-        }
-
-        public SoftwareBitmap Resize(SoftwareBitmap softwareBitmap, float newWidth, float newHeight)
-        {
-            using (var resourceCreator = CanvasDevice.GetSharedDevice())
-            using (var canvasBitmap = CanvasBitmap.CreateFromSoftwareBitmap(resourceCreator, softwareBitmap))
-            using (var canvasRenderTarget = new CanvasRenderTarget(resourceCreator, newWidth, newHeight, canvasBitmap.Dpi))
-            using (var drawingSession = canvasRenderTarget.CreateDrawingSession())
-            using (var scaleEffect = new ScaleEffect())
-            {
-                scaleEffect.Source = canvasBitmap;
-                scaleEffect.Scale = new System.Numerics.Vector2(newWidth / softwareBitmap.PixelWidth, newHeight / softwareBitmap.PixelHeight);
-                drawingSession.DrawImage(scaleEffect);
-                drawingSession.Flush();
-                return SoftwareBitmap.CreateCopyFromBuffer(canvasRenderTarget.GetPixelBytes().AsBuffer(), BitmapPixelFormat.Bgra8, (int)newWidth, (int)newHeight, BitmapAlphaMode.Premultiplied);
-            }
         }
 
         /// <summary>

@@ -133,5 +133,15 @@ namespace AgoraUWP
                 default: return Stretch.None;
             }
         }
+
+        public override void Dispose()
+        {
+            if (target != null)
+            {
+                var source = target.ImageSource as SoftwareBitmapSource;
+                source?.Dispose();
+                target.ImageSource = null;
+            }
+        }
     }
 }

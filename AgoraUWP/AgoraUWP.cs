@@ -1,20 +1,30 @@
 ﻿using AgoraWinRT;
+using Microsoft.Graphics.Canvas;
+using Microsoft.Graphics.Canvas.UI.Composition;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Numerics;
 using System.Runtime.InteropServices.WindowsRuntime;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Windows.Devices.Enumeration;
 using Windows.Foundation;
+using Windows.Graphics.Capture;
+using Windows.Graphics.DirectX;
+using Windows.Graphics.Imaging;
 using Windows.Media.Capture;
 using Windows.Media.Capture.Frames;
 using Windows.Media.MediaProperties;
 using Windows.Security.Authentication.Identity.Core;
 using Windows.Security.Cryptography.Core;
+using Windows.UI.Composition;
 using Windows.UI.Notifications;
+using Windows.UI.Xaml;
+using Windows.UI.Xaml.Hosting;
 using Windows.UI.Xaml.Media;
- 
+
 namespace AgoraUWP
 {
     public class AgoraRtc : AgoraWinRT.AgoraRtc,
@@ -142,6 +152,8 @@ namespace AgoraUWP
 
         public new void Dispose()
         {
+            StopScreenCapture();
+
             videoDeviceWatcher?.Stop();
             videoTesting = false;
             defaultMediaCapturer?.Dispose();
@@ -221,6 +233,88 @@ namespace AgoraUWP
         {
             return new VideoDeviceManager(this);
         }
+
+        #region screen share
+        private CanvasDevice screenCaptureCanvasDevice = new CanvasDevice();
+        private bool running = false;
+        private SoftwareBitmap backBuffer = null;
+        private Direct3D11CaptureFramePool captureFramePool;
+        private GraphicsCaptureSession captureSession;
+        private VideoCanvas screenCanvas;
+
+        public void SetupLocalScreenVideo(VideoCanvas screenCanvas)
+        {
+            this.screenCanvas = screenCanvas;
+        }
+
+        public void SetLocalScreenVideoRenderMode(RENDER_MODE_TYPE renderMode, VIDEO_MIRROR_MODE_TYPE mirrorMode)
+        {
+            if (this.screenCanvas != null)
+            {
+                this.screenCanvas.RenderMode = renderMode;
+                this.screenCanvas.MirrorMode = mirrorMode;
+            }
+        }
+
+        public async void StartScreenCapture()
+        {
+            StopScreenCapture();
+            var picker = new GraphicsCapturePicker();
+            var captureItem = await picker.PickSingleItemAsync();
+            if (captureItem != null)
+            {
+                captureFramePool = Direct3D11CaptureFramePool.Create(screenCaptureCanvasDevice, DirectXPixelFormat.B8G8R8A8UIntNormalized, 2, captureItem.Size);
+                captureFramePool.FrameArrived += ScreeCaptureFrameArrivedEvent;
+                captureItem.Closed += (sender, args) =>
+                {
+                    StopScreenCapture();
+                };
+                captureSession = captureFramePool.CreateCaptureSession(captureItem);
+                captureSession.StartCapture();
+            }
+        }
+
+        private void ScreeCaptureFrameArrivedEvent(Direct3D11CaptureFramePool sender, object args)
+        {
+            using (var frame = sender.TryGetNextFrame())
+            {
+                var b = SoftwareBitmap.CreateCopyFromSurfaceAsync(frame.Surface, BitmapAlphaMode.Ignore).AsTask().GetAwaiter().GetResult();
+                this.screenCanvas?.Render(b);
+                b = Interlocked.Exchange(ref backBuffer, b);
+                b?.Dispose();
+
+                Task.Factory.StartNew(() =>
+                {
+                    if (running) return;
+                    running = true;
+                    using (var b = Interlocked.Exchange(ref backBuffer, null))
+                    using (var a = Utils.Resize(b, b.PixelWidth % 2 == 0 ? b.PixelWidth : b.PixelWidth + 1, b.PixelHeight % 2 == 0 ? b.PixelHeight : b.PixelHeight + 1))
+                    using (var n = SoftwareBitmap.Convert(a, BitmapPixelFormat.Nv12))
+                    using (var externalFrame = new ExternalVideoFrame())
+                    {
+                        var nbuffer = new Windows.Storage.Streams.Buffer((uint)(n.PixelWidth * n.PixelHeight * 3 / 2));
+                        n.CopyToBuffer(nbuffer);
+                        externalFrame.format = VIDEO_PIXEL_FORMAT.VIDEO_PIXEL_NV12;
+                        externalFrame.type = VIDEO_BUFFER_TYPE.VIDEO_BUFFER_RAW_DATA;
+                        externalFrame.stride = (uint)n.PixelWidth;
+                        externalFrame.height = (uint)n.PixelHeight;
+
+                        externalFrame.buffer = nbuffer.ToArray();
+                        this.PushVideoFrame(externalFrame);
+                    }
+                    running = false;
+                });
+            }
+        }
+
+        public void StopScreenCapture()
+        {
+            this.captureSession?.Dispose();
+            this.captureSession = null;
+            this.captureFramePool?.Dispose();
+            this.captureFramePool = null;
+        }
+        #endregion
 
         #region AgoraRtcEventHandler
 
