@@ -66,6 +66,18 @@ namespace ScreenCaptureDemo
             }
 
             this.engine = new AgoraUWP.AgoraRtc(this.VendorKey);
+            log("Set Video Encoder Configuration",
+                engine.SetVideoEncoderConfiguration(new VideoEncoderConfiguration
+                {
+                    dimensions = new VideoDimensions { width = 1920, height = 1080 },
+                    frameRate = FRAME_RATE.FRAME_RATE_FPS_60,
+                    minFrameRate = -1,
+                    bitrate = 1600,
+                    minBitrate = 0,
+                    orientationMode = ORIENTATION_MODE.ORIENTATION_MODE_ADAPTIVE,
+                    degradationPreference = DEGRADATION_PREFERENCE.MAINTAIN_QUALITY,
+                    mirrorMode = VIDEO_MIRROR_MODE_TYPE.VIDEO_MIRROR_MODE_DISABLED,
+                }));
             this.log("set external video source", this.engine.SetExternalVideoSource(true, false));
             this.log("enable video", this.engine.EnableVideo());
             this.log("disable audio", this.engine.DisableAudio());

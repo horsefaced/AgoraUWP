@@ -51,7 +51,6 @@ namespace AgoraUWPDemo
         private static readonly uint DEFAULT_SAMPLE_RATE = 48000;
 
         private AgoraUWP.AgoraRtc engine;
-        private AgoraUWP.AgoraRtc screenEngine;
 
         private IMediaCapturer m_audioCapture;
         private AudioGraph m_audioGraph;
@@ -116,6 +115,7 @@ namespace AgoraUWPDemo
             m_dimensions.Add(2, new VideoDimensions { width = 640, height = 360 });
             m_dimensions.Add(3, new VideoDimensions { width = 640, height = 480 });
             m_dimensions.Add(4, new VideoDimensions { width = 960, height = 720 });
+            m_dimensions.Add(5, new VideoDimensions { width = 1920, height = 1080 });
 
             m_bitrates = new Dictionary<int, int>();
             m_bitrates.Add(0, 100);
@@ -136,11 +136,19 @@ namespace AgoraUWPDemo
             btnMuteVideo.Click += MuteVideo;
             btnTest.Click += TestCode;
             btnScreenCapture.Click += ScreenCapture;
+            btnOuterScreenCapture.Click += BtnOuterScreenCapture_Click;
 
             btnMirrorLocalVideo.Checked += MirrorLocalVideo;
             btnMirrorLocalVideo.Unchecked += UnMirrorLocalVideo;
 
             cbLocalVideoRenderMode.SelectionChanged += RenderLocalVideoMode;
+        }
+
+        private async void BtnOuterScreenCapture_Click(object sender, RoutedEventArgs e)
+        {
+            var uri = new Uri($"asc://{txtChannelName.Text}?key={txtVendorKey.Text}&token={txtChannelToken.Text}&uid=666");
+            var success = await Windows.System.Launcher.LaunchUriAsync(uri);
+
         }
 
         private void RenderLocalVideoMode(object sender, SelectionChangedEventArgs e)
@@ -159,7 +167,7 @@ namespace AgoraUWPDemo
                 case 2: renderMode = RENDER_MODE_TYPE.RENDER_MODE_FILL; break;
             }
             this.engine?.SetLocalRenderMode(renderMode, mirrorMode);
-            this.screenEngine?.SetLocalScreenVideoRenderMode(renderMode, mirrorMode);
+            this.engine?.SetLocalScreenVideoRenderMode(renderMode, mirrorMode);
         }
 
         private void UnMirrorLocalVideo(object sender, RoutedEventArgs e)
@@ -174,31 +182,43 @@ namespace AgoraUWPDemo
 
         private async void ScreenCapture(object sender, RoutedEventArgs e)
         {
-            if (this.screenEngine != null)
+            if (this.engine != null)
             {
-                this.screenEngine.LeaveChannel();
-                this.screenEngine.Dispose();
-                this.screenEngine = null;
+                this.engine.LeaveChannel();
+                this.engine.Dispose();
+                this.engine = null;
             }
 
-            this.screenEngine = new AgoraUWP.AgoraRtc(txtVendorKey.Text);
-            this.log("set external video source", this.screenEngine.SetExternalVideoSource(true, false));
-            this.log("enable video", this.screenEngine.EnableVideo());
-            this.log("disable audio", this.screenEngine.DisableAudio());
-            this.log("disable lastmile test", this.screenEngine.DisableLastmileTest());
-            this.log("set channel profile", this.screenEngine.SetChannelProfile(AgoraWinRT.CHANNEL_PROFILE_TYPE.CHANNEL_PROFILE_LIVE_BROADCASTING));
-            this.log("set client role", this.screenEngine.SetClientRole(AgoraWinRT.CLIENT_ROLE_TYPE.CLIENT_ROLE_BROADCASTER));
-            this.log("mute all remote audio", this.screenEngine.MuteAllRemoteAudioStreams(true));
-            this.log("mute all remote video", this.screenEngine.MuteAllRemoteVideoStream(true));
-            this.log("join channel", this.screenEngine.JoinChannel(txtChannelToken.Text, txtChannelName.Text, "", SCREEN_UID));
+            this.engine = new AgoraUWP.AgoraRtc(txtVendorKey.Text);
+            log("Set Video Encoder Configuration",
+                engine.SetVideoEncoderConfiguration(new VideoEncoderConfiguration
+                {
+                    dimensions = m_dimensions[cbResolution.SelectedIndex],
+                    frameRate = m_frameRates[cbFrameRate.SelectedIndex],
+                    minFrameRate = -1,
+                    bitrate = m_bitrates[cbBitrate.SelectedIndex],
+                    minBitrate = 0,
+                    orientationMode = ORIENTATION_MODE.ORIENTATION_MODE_ADAPTIVE,
+                    degradationPreference = DEGRADATION_PREFERENCE.MAINTAIN_QUALITY,
+                    mirrorMode = VIDEO_MIRROR_MODE_TYPE.VIDEO_MIRROR_MODE_DISABLED,
+                }));
+            this.log("set external video source", this.engine.SetExternalVideoSource(true, false));
+            this.log("enable video", this.engine.EnableVideo());
+            this.log("disable audio", this.engine.DisableAudio());
+            this.log("disable lastmile test", this.engine.DisableLastmileTest());
+            this.log("set channel profile", this.engine.SetChannelProfile(AgoraWinRT.CHANNEL_PROFILE_TYPE.CHANNEL_PROFILE_LIVE_BROADCASTING));
+            this.log("set client role", this.engine.SetClientRole(AgoraWinRT.CLIENT_ROLE_TYPE.CLIENT_ROLE_BROADCASTER));
+            this.log("mute all remote audio", this.engine.MuteAllRemoteAudioStreams(true));
+            this.log("mute all remote video", this.engine.MuteAllRemoteVideoStream(true));
+            this.log("join channel", this.engine.JoinChannel(txtChannelToken.Text, txtChannelName.Text, "", SCREEN_UID));
 
-            this.screenEngine.SetupLocalScreenVideo(new SpriteVisualVideoCanvas
+            this.engine.SetupLocalScreenVideo(new SpriteVisualVideoCanvas
             {
                 Target = screenVideo,
                 RenderMode = RENDER_MODE_TYPE.RENDER_MODE_FIT,
                 MirrorMode = btnMirrorLocalVideo.IsChecked.GetValueOrDefault(false) ? VIDEO_MIRROR_MODE_TYPE.VIDEO_MIRROR_MODE_ENABLED : VIDEO_MIRROR_MODE_TYPE.VIDEO_MIRROR_MODE_DISABLED
             });
-            await screenEngine.StartScreenCapture();
+            await engine.StartScreenCapture();
         }
 
         private void MuteVideo(object sender, RoutedEventArgs e)
